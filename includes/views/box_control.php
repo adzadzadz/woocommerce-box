@@ -14,10 +14,11 @@
 .mcs_wcb_stats {
     overflow: auto;
     word-wrap: break-word;
+    width: 100%;
 }
 </style>
 
 <div class="mcs_wcb_box_view">
-    <h2 class="mcs_wcb_current_point_value">Loading...</h2>
+    <h2 class="mcs_wcb_title">Loading...</h2>
     <div class="mcs_wcb_stats"></div>
 </div>

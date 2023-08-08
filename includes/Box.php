@@ -3,17 +3,17 @@
 namespace WCB;
 
 class Box {
-    private $size;
+    private String $size;
 
-    private $max_point_value;
+    private Int $max_point_value = 0;
 
-    private $current_point_value = 0;
+    private Int $current_point_value = 0;
 
-    private $status = 0;
+    private Int $status = 0;
 
     private Int $quantity = 1;
     
-    private $items = [];
+    private Array $items = [];
 
     public function __construct($size, $max_point_value)
     {
@@ -23,7 +23,19 @@ class Box {
 
     public function get_max_point_value()
     {
-        return $this->max_point_value;
+        return $this->max_point_value * $this->quantity;
+    }
+
+    public function get_props($props)
+    {
+        $box = [];
+        foreach ($props as $prop) {
+            if ($prop == 'max_point_value')
+                $box[$prop] = $this->get_max_point_value();
+            else
+                $box[$prop] = $this->$prop;
+        }
+        return $box;
     }
 
     public function get_size()
@@ -33,8 +45,8 @@ class Box {
 
     public function set_quantity(Int $quantity)
     {
-        $this->max_point_value = $quantity * $this->get_max_point_value();
         $this->quantity = $quantity;
+        return $this;
     }
 
     public function get_quantity()

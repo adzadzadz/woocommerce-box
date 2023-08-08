@@ -4,8 +4,7 @@ jQuery(function($) {
 
     // Ajax request to update box status
     function update_box_status() {
-        console.log(wcb_box_control.ajax_url);
-
+        console.log("Updating box status");
         $.ajax({
             url: wcb_box_control.ajax_url,
             type: 'post',
@@ -13,18 +12,18 @@ jQuery(function($) {
                 action: 'wcb_update_box'
             },
             success: function(response) {
-                console.log(response);
                 let data = JSON.parse(response);
+                console.log(data);
+                let cart_items_point_value = data.cart_items_point_value;
                 let box_view = $('.mcs_wcb_box_view');
-                box_view.find('.mcs_wcb_current_point_value').html(data.rate + '%');
-
-                box_view.find('.mcs_wcb_stats').html('');
-                for(let key in data) {
-                    console.log(key);
-                    console.log(data[key]);
-                    box_view.find('.mcs_wcb_stats').append(`<div>${key}: ${data[key]}</div>`);
-                }
-                
+                let rate = (cart_items_point_value / data.boxes.max_point_value ) * 100;
+                rate = rate.toFixed(2) + "%";
+                box_view.find(".mcs_wcb_title").text(rate);
+                box_view.find(".mcs_wcb_stats").html(`
+                    <div class="mcs_wcb_stats_item">Boxes: ${data.boxes.size}</div>
+                    <div class="mcs_wcb_stats_item">Cart Point Value: ${cart_items_point_value}</div>
+                    <div class="mcs_wcb_stats_item">Max Point Value: ${data.boxes.max_point_value}</div>
+                `)
             }
         });
     }

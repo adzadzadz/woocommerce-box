@@ -4,9 +4,6 @@ namespace WCB;
 
 class Box_Control extends Base
 {
-
-    private array $boxes = [];
-
     protected array $actions = [
         // add ajax action for box status change
         ['wp_ajax_wcb_update_box', 'update_box_status'],
@@ -16,32 +13,43 @@ class Box_Control extends Base
         ['wp_enqueue_scripts', 'enqueue_box_control_scripts'],
     ];
 
+    private array $available_boxes = [];
+
+    private array $selected_boxes = [];
+
+    private Int $default_item_point_value = 50;
+
     public function init()
     {
         parent::init();
         // register shortcode
         add_shortcode('wcb_show_box', [$this, 'create_box_view_shortcode']);
-
-        // create boxes
-        foreach ($this->config['box'] as $size => $prop) {
-            // var_dump($prop['max_point_value']); exit;
-            $this->boxes[$size] = new Box($size, $prop['max_point_value'] ?? 0);
-        }
-        // foreach ($this->boxes as $size => $box) {
-        //     $box->set_quantity(2);
-        //     var_dump($box->get_max_point_value()); exit;
-        // }
-        // var_dump($this->boxes); exit;
+        $this->set_boxes($this->config['boxes']);
     }
 
-    public function set_boxes($boxes)
+    public function get_selected_boxes(array $props = null)
     {
-        $this->boxes = $boxes;
+        if ($props) {
+            $selected_boxes = [];
+            foreach ($this->selected_boxes as $box) {
+                $selected_boxes[] = $box->get_props($props);
+            }
+            return $selected_boxes;
+        }
+        return $this->selected_boxes;
+    }
+
+    public function set_boxes(array $boxes)
+    {
+        foreach ($boxes as $id => $prop) {
+            $this->available_boxes[$id] = new Box($prop['size'], $prop['max_point_value'] ?? 0);
+        }
+        return $this;
     }
 
     public function get_boxes()
     {
-        return $this->boxes;
+        return $this->available_boxes;
     }
 
     public function get_woo_cart_items_total_point_value()
@@ -51,7 +59,9 @@ class Box_Control extends Base
         // get cart items point value
         $cart_items_point_value = 0;
         foreach ($cart_items as $cart_item) {
-            $points = empty($cart_item['data']->get_meta('wcb_item_points')) ? 50 : $cart_item['data']->get_meta('wcb_item_points');
+            $points = empty($cart_item['data']->get_meta('wcb_item_points'))
+                ? $this->default_item_point_value
+                : $cart_item['data']->get_meta('wcb_item_points');
             $cart_items_point_value += $points * $cart_item['quantity'];
         }
         return $cart_items_point_value;
@@ -59,38 +69,67 @@ class Box_Control extends Base
 
     public function assign_box($cart_items_point_value)
     {
-        // infinite loop
-        for ($i = 1; $i > 0; $i++) {
-            // assign box
-            foreach ($this->boxes as $size => $box) {
-                $box->set_quantity($i);
-                if ($box->get_max_point_value() >= $cart_items_point_value) {
-                    return [
-                        'size' => $size,
-                        'box'  => $box,
-                    ];
+        $left_over_points = $cart_items_point_value;
+
+        while ($left_over_points > 0) {
+            $i = count($this->available_boxes);
+            $prev_box = null;
+            // error_log("top: " . print_r($left_over_points, true));
+            foreach ($this->available_boxes as $box) {
+                $i--;
+
+                if ($box->get_max_point_value() >= $left_over_points) {
+                    $left_over_points -= $box->get_max_point_value();
+                    $this->selected_boxes[] = $box;
+                } 
+                elseif ($prev_box && ($prev_box->get_max_point_value() * ($prev_box->get_quantity() + 1)) >= $left_over_points) {
+                    $left_over_points -= ($prev_box->get_max_point_value() * ($prev_box->get_quantity() + 1));
+                    $this->selected_boxes[] = $prev_box;
+                    $this->selected_boxes[] = $prev_box;
+                } 
+                elseif ($prev_box && ($box->get_max_point_value() + $prev_box->get_max_point_value()) >= $left_over_points) {
+                    $left_over_points -= ($box->get_max_point_value() + $prev_box->get_max_point_value());
+                    $this->selected_boxes[] = $prev_box;
+                    $this->selected_boxes[] = $box;
+                } 
+                elseif ($i == 0) {
+                    $left_over_points -= $box->get_max_point_value();
+                    $this->selected_boxes[] = $box;
                 }
+
+                // error_log("bot: " . print_r($left_over_points, true));
+                $prev_box = $box;
+                if ( $left_over_points <= 0) 
+                    break;
             }
         }
-        return false;
+        return $this;
+    }
+
+    public function get_summary(array $props = null)
+    {
+        $selected_boxes = $this->get_selected_boxes($props);
+
+        $summary = [];
+        $summary['max_point_value'] = 0;
+        $summary['size'] = '';
+
+        foreach ($selected_boxes as $box) {
+            $summary['max_point_value'] += $box['max_point_value'];
+            $summary['size'] .= "{$box['size']}: {$box['quantity']}, ";
+        }
+
+        return $summary;
     }
 
     public function update_box_status()
     {
         try {
-            $total_cart_value = $this->get_woo_cart_items_total_point_value();
-            $assigned_box = $this->assign_box($total_cart_value);
-            $max_point_value = $assigned_box['box']->get_max_point_value();
-            // get the rate of total_cart_value from box max_point_value
-            $rate = ($total_cart_value / $max_point_value) * 100;
-
             echo json_encode([
-                'box_size' => $assigned_box['size'],
-                'box_quantity' => $assigned_box['box']->get_quantity(),
-                'box_current_point_value' => $total_cart_value,
-                'box_max_point_value' => $max_point_value,
-                'rate' => number_format((float)$rate, 2, '.', ''),
-                'cart_items' => WC()->cart->get_cart_contents_count(),
+                'success' => 'Box status updated',
+                'cart_items_point_value' => $pv = $this->get_woo_cart_items_total_point_value(),
+                'boxes'   => $this->assign_box($pv)
+                    ->get_summary(['size', 'max_point_value', 'current_point_value', 'quantity']),
             ]);
         } catch (\Throwable $th) {
             echo json_encode(['error' => $th->getMessage()]);
@@ -107,6 +146,6 @@ class Box_Control extends Base
 
     public function create_box_view_shortcode($atts)
     {
-        return $this->render('box_control', ['boxes' => $this->boxes]);
+        return $this->render('box_control', ['boxes' => $this->available_boxes]);
     }
 }
