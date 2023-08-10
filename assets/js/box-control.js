@@ -14,16 +14,38 @@ jQuery(function($) {
             success: function(response) {
                 let data = JSON.parse(response);
                 console.log(data);
-                let cart_items_point_value = data.cart_items_point_value;
                 let box_view = $('.mcs_wcb_box_view');
-                let rate = (cart_items_point_value / data.boxes.max_point_value ) * 100;
-                rate = rate.toFixed(2) + "%";
-                box_view.find(".mcs_wcb_title").text(rate);
-                box_view.find(".mcs_wcb_stats").html(`
-                    <div class="mcs_wcb_stats_item">Boxes: ${data.boxes.size}</div>
-                    <div class="mcs_wcb_stats_item">Cart Point Value: ${cart_items_point_value}</div>
-                    <div class="mcs_wcb_stats_item">Max Point Value: ${data.boxes.max_point_value}</div>
-                `)
+                box_view.find(".mcs_wcb_progress_bar").css("width", data.progress + "%");
+                box_view.find(".mcs_wcb_progress_bar .progress_value").text(data.progress + "%");
+
+                let info_text = '';
+                data['boxes']['size'].forEach(function(size, idx) {
+                    if (idx == 0 && data['boxes']['size'].length == 1) { // catch if only 1 box
+                        info_text += `<strong>1</strong> ${size} box is`
+                        return;
+                    }
+
+                    if (idx == 0) { // catch first loop
+                        info_text += `<strong>1</strong> ${size} box`;
+                    } 
+                    else if (idx == data['boxes']['size'].length - 1) { // catch last loop
+                        info_text += ` and <strong>1</strong> ${size} box are`;   
+                    }
+                    else { // catch if not first or last loop
+                        info_text += `, <strong>1</strong> ${size} box`;
+                    }
+                    console.log("size", size);
+                });
+
+                info_text += ` ${data.progress}% full.`;
+
+                box_view.find(".mcs_wcb_info").html(info_text);
+
+                // box_view.find(".mcs_wcb_stats").html(`
+                //     <div class="mcs_wcb_stats_item">Boxes: ${data.boxes.size}</div>
+                //     <div class="mcs_wcb_stats_item">Cart Point Value: ${cart_items_point_value}</div>
+                //     <div class="mcs_wcb_stats_item">Max Point Value: ${data.boxes.max_point_value}</div>
+                // `)
             }
         });
     }

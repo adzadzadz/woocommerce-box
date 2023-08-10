@@ -11,3 +11,50 @@
     font-size: 1.3em;
     text-align: center;
 }
+
+/* Box view shortcode style */
+.mcs_wcb_box_view {
+    align-items: center;
+    width: 400px;
+    height: 120px;
+    padding: 20px;
+    box-sizing: border-box;
+    background-color: #f5f5f5;
+    border: #313131 solid 1px;
+}
+
+.mcs_wcb_title {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.mcs_wcb_stats {
+    overflow: auto;
+    word-wrap: break-word;
+    width: 100%;
+}
+
+/* Progress Bar */
+.mcs_wcb_progress_wrap {
+    background-color: #fff;
+    border: #313131 solid 1px;
+    padding: 0;
+    position: relative;
+}
+.mcs_wcb_progress_bar {
+    width: 0%;
+    height: 25px;
+    background-color: green;
+    padding: 0;
+    text-align: center;
+    transition: 1s;
+    -webkit-transition: 1s;
+    -moz-transition: 1s;
+    -ms-transition: 1s;
+    -o-transition: 1s;
+    /* position: relative; */
+}
+.progress_value {
+    position: absolute;
+    left: 36%;
+}
