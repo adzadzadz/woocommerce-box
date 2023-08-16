@@ -1,14 +1,17 @@
-<?php 
+<?php
 
 namespace WCB;
 
-abstract class Base {
+abstract class Base
+{
 
-    protected Array $actions;
-    
-    protected Array $config;
+    protected array $actions = [];
 
-    public function __construct(Array $config = null, Array $props = null)
+    protected array $filters = [];
+
+    protected array $config;
+
+    public function __construct(array $config = null, array $props = null)
     {
         $this->config = $config ?? [];
         if (isset($props)) {
@@ -16,9 +19,16 @@ abstract class Base {
                 $this->$key = $value;
             }
         }
+
         foreach ($this->actions as $action) {
             add_action($action[0], [$this, $action[1]], $action[2] ?? null, $action[3] ?? null);
         }
+
+        foreach ($this->filters as $filter) {
+            add_filter($filter[0], [$this, $filter[1]], $filter[2] ?? null, $filter[3] ?? null);
+        }
+
+
         $this->init();
     }
 
@@ -36,5 +46,4 @@ abstract class Base {
         ob_end_clean();
         return $content;
     }
-
 }

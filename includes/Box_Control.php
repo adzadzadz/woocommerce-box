@@ -4,18 +4,25 @@ namespace WCB;
 
 class Box_Control extends Base
 {
-    protected Array $actions = [
+    protected array $actions = [
         // add ajax action for box status change
         ['wp_ajax_wcb_update_box', 'update_box_status'],
         // add nopriv ajax for update_box_status
         ['wp_ajax_nopriv_wcb_update_box', 'update_box_status'],
         // enqueue scripts and styles
         ['wp_enqueue_scripts', 'enqueue_box_control_scripts'],
+        // Inject box view shortcode
+        ['wp_body_open', 'inject_box_view_shortcode']
     ];
 
-    private Array $available_boxes = [];
+    protected array $filters = [
+        ['woocommerce_package_rates', 'add_additional_shipping_charge', 10, 2],
+        ['wc_add_to_cart_message_html', 'push_add_to_cart_notification_update', 10, 2]
+    ];
 
-    private Array $selected_boxes = [];
+    private array $available_boxes = [];
+
+    private array $selected_boxes = [];
 
     private Int $default_item_point_value = 50;
 
@@ -24,10 +31,43 @@ class Box_Control extends Base
         parent::init();
         // register shortcode
         add_shortcode('wcb_show_box', [$this, 'create_box_view_shortcode']);
-        $this->set_boxes($this->config['boxes']);
+
+        $this->set_boxes($this->config['boxes']);       
     }
 
-    public function get_selected_boxes(Array $props = null)
+    public function add_additional_shipping_charge( $rates, $package ) {
+        $additional_charge = 12; // Set your additional charge here
+    
+        foreach ( $rates as $rate_key => $rate_values ) {
+            $rates[ $rate_key ]->cost += $additional_charge;
+    
+            // If tax is applied to the shipping cost, you might want to adjust that as well
+            foreach ($rates[ $rate_key ]->taxes as $tax_key => $tax ) {
+                $rates[ $rate_key ]->taxes[ $tax_key ] += $additional_charge;
+            }
+        }
+    
+        return $rates;
+    }
+
+    public function push_add_to_cart_notification_update($message, $products)
+    {
+        $pv = $this->get_woo_cart_items_total_point_value();
+        $assigned = $this->assign_box($pv)
+            ->get_summary(['size', 'max_point_value', 'current_point_value', 'quantity']);
+        $custom_text = '<strong>Shipping:</strong>';
+
+        foreach ($assigned['size'] as $size) {
+            $custom_text .= ' 1 ' . $size . ' box';
+        }
+
+        $progress = number_format(($pv / $assigned['max_point_value']) * 100, 2);
+        $custom_text .= " is <strong>$progress%</strong> full.";
+
+        return $message . ' <p>' . $custom_text . '</p>';
+    }
+
+    public function get_selected_boxes(array $props = null)
     {
         if ($props) {
             $selected_boxes = [];
@@ -39,7 +79,7 @@ class Box_Control extends Base
         return $this->selected_boxes;
     }
 
-    public function set_boxes(Array $boxes)
+    public function set_boxes(array $boxes)
     {
         foreach ($boxes as $id => $prop) {
             $this->available_boxes[$id] = new Box($prop['size'], $prop['max_point_value'] ?? 0);
@@ -81,25 +121,22 @@ class Box_Control extends Base
                 if ($box->get_max_point_value() >= $left_over_points) {
                     $left_over_points -= $box->get_max_point_value();
                     $this->selected_boxes[] = $box;
-                } 
-                elseif ($prev_box && ($prev_box->get_max_point_value() * ($prev_box->get_quantity() + 1)) >= $left_over_points) {
+                } elseif ($prev_box && ($prev_box->get_max_point_value() * ($prev_box->get_quantity() + 1)) >= $left_over_points) {
                     $left_over_points -= ($prev_box->get_max_point_value() * ($prev_box->get_quantity() + 1));
                     $this->selected_boxes[] = $prev_box;
                     $this->selected_boxes[] = $prev_box;
-                } 
-                elseif ($prev_box && ($box->get_max_point_value() + $prev_box->get_max_point_value()) >= $left_over_points) {
+                } elseif ($prev_box && ($box->get_max_point_value() + $prev_box->get_max_point_value()) >= $left_over_points) {
                     $left_over_points -= ($box->get_max_point_value() + $prev_box->get_max_point_value());
                     $this->selected_boxes[] = $prev_box;
                     $this->selected_boxes[] = $box;
-                } 
-                elseif ($i == 0) {
+                } elseif ($i == 0) {
                     $left_over_points -= $box->get_max_point_value();
                     $this->selected_boxes[] = $box;
                 }
 
                 // error_log("bot: " . print_r($left_over_points, true));
                 $prev_box = $box;
-                if ( $left_over_points <= 0) 
+                if ($left_over_points <= 0)
                     break;
             }
         }
@@ -151,5 +188,13 @@ class Box_Control extends Base
     public function create_box_view_shortcode($atts)
     {
         return $this->render('shortcode_box_view', ['boxes' => $this->available_boxes]);
+    }
+
+    public function inject_box_view_shortcode()
+    {
+        echo $this->render('shortcode_box_view', [
+            'id'    => 'mcs_wcb_box_view_cart_widget',
+            'boxes' => $this->available_boxes
+        ]);
     }
 }
