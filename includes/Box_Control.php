@@ -12,17 +12,21 @@ class Box_Control extends Base
         // enqueue scripts and styles
         ['wp_enqueue_scripts', 'enqueue_box_control_scripts'],
         // Inject box view shortcode
-        ['wp_body_open', 'inject_box_view_shortcode']
+        ['wp_body_open', 'inject_box_view_shortcode'],
+        // add additional shipping charge
+        ['woocommerce_cart_calculate_fees', 'add_additional_charge_with_label', 20, 1],
     ];
 
     protected array $filters = [
-        ['woocommerce_package_rates', 'add_additional_shipping_charge', 10, 2],
+        // ['woocommerce_package_rates', 'add_additional_shipping_charge', 10, 2],
         ['wc_add_to_cart_message_html', 'push_add_to_cart_notification_update', 10, 2]
     ];
 
     private array $available_boxes = [];
 
     private array $selected_boxes = [];
+
+    private \WCB\Box_Rules $rules;
 
     private Int $default_item_point_value = 50;
 
@@ -32,36 +36,91 @@ class Box_Control extends Base
         // register shortcode
         add_shortcode('wcb_show_box', [$this, 'create_box_view_shortcode']);
 
-        $this->set_boxes($this->config['boxes']);       
+        $this->rules = new \WCB\Box_Rules($this->config['rules']);
+        $this->set_boxes($this->config['boxes']);
     }
 
-    public function add_additional_shipping_charge( $rates, $package ) {
-        $additional_charge = 12; // Set your additional charge here
-    
-        foreach ( $rates as $rate_key => $rate_values ) {
-            $rates[ $rate_key ]->cost += $additional_charge;
-    
-            // If tax is applied to the shipping cost, you might want to adjust that as well
-            foreach ($rates[ $rate_key ]->taxes as $tax_key => $tax ) {
-                $rates[ $rate_key ]->taxes[ $tax_key ] += $additional_charge;
+    // public function add_additional_shipping_charge($rates, $package)
+    // {
+    //     $additional_charge = 12; // Set your additional charge here
+
+    //     foreach ($rates as $rate_key => $rate_values) {
+    //         $rates[$rate_key]->cost += $additional_charge;
+
+    //         // If tax is applied to the shipping cost, you might want to adjust that as well
+    //         foreach ($rates[$rate_key]->taxes as $tax_key => $tax) {
+    //             $rates[$rate_key]->taxes[$tax_key] += $additional_charge;
+    //         }
+    //     }
+
+    //     return $rates;
+    // }
+
+    public function add_additional_charge_with_label($cart)
+    {
+        if (is_admin() && !defined('DOING_AJAX'))
+            return;
+
+        $assigned = $this->get_assigned_boxes();
+        $add_cost = 0;
+        $box_qty = [
+            'small' => 0,
+            'large' => 0
+        ];
+
+        // if (!$this->rules->is_min_box_fill_rate_reached(number_format(($assigned['pv'] / $assigned['box']['max_point_value']) * 100, 2))) {
+        // if (!$this->rules->is_min_spent_reached()) {
+            foreach ($assigned['box']['size'] as $size) {
+                $size = strtolower($size);
+                if ($size == 'small') {
+                    $add_cost += 30;
+                    $box_qty['small'] ++;
+                } elseif ($size == 'large') {
+                    $add_cost += 50;
+                    $box_qty['large'] ++;
+                }
             }
+        // }
+        // }
+        
+        $box_label = '';
+        if ($box_qty['small'] > 0) {
+            $box_label .= "Small box x{$box_qty['small']}";
         }
-    
-        return $rates;
+        if ($box_qty['small'] > 0 && $box_qty['large'] > 0) {
+            $box_label .= " and ";
+        }
+        if ($box_qty['large'] > 0) {
+            $box_label .= "Large box x{$box_qty['large']}";
+        }
+
+        $additional_charge = $add_cost; // Set your additional charge here
+        $label = "Shipping ({$box_label})"; // Set your label here
+
+        $cart->add_fee($label, $additional_charge);
+    }
+
+    public function get_assigned_boxes()
+    {
+        $pv = $this->get_woo_cart_items_total_point_value();
+        $box = $this->assign_box($pv)
+            ->get_summary(['size', 'max_point_value', 'current_point_value', 'quantity']);
+        return [
+            'pv'  => $pv,
+            'box' => $box
+        ];
     }
 
     public function push_add_to_cart_notification_update($message, $products)
     {
-        $pv = $this->get_woo_cart_items_total_point_value();
-        $assigned = $this->assign_box($pv)
-            ->get_summary(['size', 'max_point_value', 'current_point_value', 'quantity']);
+        $assigned = $this->get_assigned_boxes();
         $custom_text = '<strong>Shipping:</strong>';
 
-        foreach ($assigned['size'] as $size) {
+        foreach ($assigned['box']['size'] as $size) {
             $custom_text .= ' 1 ' . $size . ' box';
         }
 
-        $progress = number_format(($pv / $assigned['max_point_value']) * 100, 2);
+        $progress = number_format(($assigned['pv'] / $assigned['box']['max_point_value']) * 100, 2);
         $custom_text .= " is <strong>$progress%</strong> full.";
 
         return $message . ' <p>' . $custom_text . '</p>';
