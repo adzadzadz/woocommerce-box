@@ -1,5 +1,5 @@
 jQuery(function ($) {
-    console.log("Start Adz");
+    console.log("MCS BOX Started");
     update_box_status();
 
     // Ajax request to update box status
@@ -22,28 +22,39 @@ jQuery(function ($) {
                 box_view.find(".mcs_wcb_progress_bar .progress_value").text(data.progress + "%");
 
                 let info_text = '';
-
+                let info_post_text = '';
+                let box_count = {
+                    'small': 0,
+                    'large': 0
+                };
                 data['boxes']['size'].forEach(function (size, idx) {
+                    if (size == 'Small') {
+                        box_count['small'] += 1;
+                    }
+                    else if (size == 'Large') {
+                        box_count['large'] += 1;
+                    }
 
                     if (idx == 0 && data['boxes']['size'].length == 1) { // catch if only 1 box
-                        info_text += `<strong>1</strong> ${size} box is`
+                        info_post_text += `is`
                         return;
                     }
-
-                    if (idx == 0) { // catch first loop
-                        info_text += `<strong>1</strong> ${size} box`;
+                    else if (idx == data['boxes']['size'].length - 1) {
+                        info_post_text += `are`
                     }
-                    else if (idx == data['boxes']['size'].length - 1) { // catch last loop
-                        info_text += ` and <strong>1</strong> ${size} box are`;
-                    }
-                    else { // catch if not first or last loop
-                        info_text += `, <strong>1</strong> ${size} box`;
-                    }
-
                 });
 
-                info_text += ` ${data.progress}% full.`;
+                if (box_count.small > 0)
+                    info_text += `<strong>${box_count.small}</strong> Small box`;
 
+                if (box_count.small > 0 && box_count.large > 0)
+                    info_text += ` and `;
+
+                if (box_count.large > 0)
+                    info_text += `<strong>${box_count.large}</strong> Large box`;
+
+                info_text += ` ${info_post_text} ${data.progress}% full.`;
+                console.log("info text:", info_text);
                 box_view.find(".mcs_wcb_info").html(info_text);
 
             }
