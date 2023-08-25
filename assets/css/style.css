@@ -26,8 +26,14 @@
 }
 
 .mcs_wcb_title {
-    font-size: 1.6em;
-    line-height: 1.8em;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: bold;
+}
+
+.cart_totals .mcs_wcb_title {
+    font-size: 16px;
+    line-height: 1.5em;
     font-weight: bold;
 }
 
@@ -35,9 +41,13 @@
     overflow: auto;
     word-wrap: break-word;
     width: 100%;
-    font-size: 1.3em;
-    line-height: 1.5em;
+    font-size: 14px;
+    line-height: 17px;
     margin-bottom: 10px;
+}
+
+.cart_totals .mcs_wcb_info {
+    font-size: 14px;
 }
 
 /* Progress Bar */
@@ -60,6 +70,7 @@
     -o-transition: 1s;
     /* position: relative; */
 }
+
 .progress_value {
     font-weight: bold;
     position: absolute;
@@ -67,4 +78,8 @@
     left: 0;
     text-align: center;
     right: 0;
+}
+
+.cart_totals .progress_value {
+    top: 0 !important;
 }

@@ -13,13 +13,16 @@ class Box_Control extends Base
         ['wp_enqueue_scripts', 'enqueue_box_control_scripts'],
         // Inject box view shortcode
         ['wp_body_open', 'inject_box_view_shortcode'],
+        // Inject box view shortcode after cart totals
+        ['woocommerce_after_cart_totals', 'custom_html_after_cart_totals'],
+        // Inject box view shortcode below the checkout total
+        ['woocommerce_review_order_before_order_total', 'custom_html_after_cart_totals'],
         // add additional shipping charge
-        ['woocommerce_cart_calculate_fees', 'add_additional_charge_with_label', 20, 1],
+        // ['woocommerce_cart_calculate_fees', 'add_additional_charge_with_label', 5, 1],
     ];
 
     protected array $filters = [
-        // ['woocommerce_package_rates', 'add_additional_shipping_charge', 10, 2],
-        ['wc_add_to_cart_message_html', 'push_add_to_cart_notification_update', 10, 2]
+        ['wc_add_to_cart_message_html', 'push_add_to_cart_notification_update', 10, 2],
     ];
 
     private array $available_boxes = [];
@@ -40,21 +43,12 @@ class Box_Control extends Base
         $this->set_boxes($this->config['boxes']);
     }
 
-    // public function add_additional_shipping_charge($rates, $package)
-    // {
-    //     $additional_charge = 12; // Set your additional charge here
-
-    //     foreach ($rates as $rate_key => $rate_values) {
-    //         $rates[$rate_key]->cost += $additional_charge;
-
-    //         // If tax is applied to the shipping cost, you might want to adjust that as well
-    //         foreach ($rates[$rate_key]->taxes as $tax_key => $tax) {
-    //             $rates[$rate_key]->taxes[$tax_key] += $additional_charge;
-    //         }
-    //     }
-
-    //     return $rates;
-    // }
+    public function custom_html_after_cart_totals() {
+        echo $this->render('shortcode_box_view', [
+            'id'    => 'mcs_wcb_box_view_cart_page',
+            'boxes' => $this->available_boxes
+        ]);
+    }
 
     public function add_additional_charge_with_label($cart)
     {
@@ -68,21 +62,23 @@ class Box_Control extends Base
             'large' => 0
         ];
 
-        // if (!$this->rules->is_min_box_fill_rate_reached(number_format(($assigned['pv'] / $assigned['box']['max_point_value']) * 100, 2))) {
-        // if (!$this->rules->is_min_spent_reached()) {
-            foreach ($assigned['box']['size'] as $size) {
-                $size = strtolower($size);
-                if ($size == 'small') {
-                    $add_cost += 30;
-                    $box_qty['small'] ++;
-                } elseif ($size == 'large') {
-                    $add_cost += 50;
-                    $box_qty['large'] ++;
-                }
+        foreach ($assigned['box']['size'] as $size) {
+            $size = strtolower($size);
+            if ($size == 'small') {
+                $add_cost += 30;
+                $box_qty['small']++;
+            } elseif ($size == 'large') {
+                $add_cost += 50;
+                $box_qty['large']++;
             }
-        // }
-        // }
-        
+        }
+
+        if ($this->rules->is_min_box_fill_rate_reached(number_format(($assigned['pv'] / $assigned['box']['max_point_value']) * 100, 2))) {
+            if ($this->rules->is_min_spent_reached()) {
+                $add_cost = 0; // reset cost to 0usd if min spent is reached
+            }
+        }
+
         $box_label = '';
         if ($box_qty['small'] > 0) {
             $box_label .= "Small box x{$box_qty['small']}";
@@ -153,17 +149,20 @@ class Box_Control extends Base
 
     public function get_woo_cart_items_total_point_value()
     {
-        // get current cart items
-        $cart_items = WC()->cart->get_cart();
-        // get cart items point value
-        $cart_items_point_value = 0;
-        foreach ($cart_items as $cart_item) {
-            $points = empty($cart_item['data']->get_meta('wcb_item_points'))
-                ? $this->default_item_point_value
-                : $cart_item['data']->get_meta('wcb_item_points');
-            $cart_items_point_value += $points * $cart_item['quantity'];
+        if (WC()->cart) {
+            // get current cart items
+            $cart_items = WC()->cart->get_cart();
+            // get cart items point value
+            $cart_items_point_value = 0;
+            foreach ($cart_items as $cart_item) {
+                $points = empty($cart_item['data']->get_meta('wcb_item_points'))
+                    ? $this->default_item_point_value
+                    : $cart_item['data']->get_meta('wcb_item_points');
+                $cart_items_point_value += $points * $cart_item['quantity'];
+            }
+            return $cart_items_point_value;
         }
-        return $cart_items_point_value;
+        return 0;
     }
 
     public function assign_box($cart_items_point_value)
@@ -253,7 +252,8 @@ class Box_Control extends Base
     {
         echo $this->render('shortcode_box_view', [
             'id'    => 'mcs_wcb_box_view_cart_widget',
-            'boxes' => $this->available_boxes
+            'boxes' => $this->available_boxes,
+            'is_hidden' => true
         ]);
     }
 }

@@ -1,4 +1,4 @@
-<div class="mcs_wcb_box_view" id="<?php echo $id ?? '' ?>" style="display: none;">
+<div class="mcs_wcb_box_view" id="<?php echo $id ?? '' ?>" style="<?= !is_null($is_hidden) && $is_hidden ? 'display: none;' : '' ?>">
     <div class="mcs_wcb_title">Shipping:</div>
     <div class="mcs_wcb_info">Calculating...</div>
     <div class="mcs_wcb_progress_wrap">

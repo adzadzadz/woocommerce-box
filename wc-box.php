@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Plugin Name: WooCommerce Box Plugin
  * Plugin URI: http://mycustomsoftware.com/
@@ -35,6 +36,7 @@ spl_autoload_register(function ($class) {
 
 define('MCS_WCB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MCS_WCB_PLUGIN_URL', plugin_dir_url(__FILE__));
+
 
 // Initialize the plugin
 new WCB\Init(require_once MCS_WCB_PLUGIN_DIR . 'config.php');

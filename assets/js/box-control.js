@@ -86,10 +86,17 @@ jQuery(function ($) {
         update_box_status();
     });
 
+    $(document).ajaxComplete(function(event, xhr, settings) {
+        if (settings.url.includes('wc-ajax=update_order_review')) {
+            // Your custom code here
+            update_box_status();
+        }
+    });
+
     function wcb_box_targeted_display(box_view) {
         $(".widget_shopping_cart_content").ready(function () {
 
-            $(this).find(".mcs_wcb_box_view").remove();
+            $(".widget_shopping_cart_content").find(".mcs_wcb_box_view").remove();
 
             let clone = $(box_view).clone(true, true);
             console.log("Box View Appending");
