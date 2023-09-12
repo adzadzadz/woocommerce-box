@@ -17,12 +17,17 @@ class Box_Control extends Base
         ['woocommerce_after_cart_totals', 'custom_html_after_cart_totals'],
         // Inject box view shortcode below the checkout total
         ['woocommerce_review_order_before_order_total', 'custom_html_after_cart_totals'],
-        // add additional shipping charge
-        // ['woocommerce_cart_calculate_fees', 'add_additional_charge_with_label', 5, 1],
+
+        ['woocommerce_checkout_update_order_meta', 'save_checkout_field', 10, 1],
+        ['woocommerce_after_shipping_rate', 'add_checkout_field'],
+        ['woocommerce_admin_order_items_after_line_items', 'insert_row_after_line_items', 10, 1],
+
+        ['wpo_wcpdf_after_order_details', 'wpo_wcpdf_box_value', 10, 2],
     ];
 
     protected array $filters = [
         ['wc_add_to_cart_message_html', 'push_add_to_cart_notification_update', 10, 2],
+        // ['woocommerce_package_rates', 'custom_shipping_condition', 10, 2]
     ];
 
     private array $available_boxes = [];
@@ -43,18 +48,68 @@ class Box_Control extends Base
         $this->set_boxes($this->config['boxes']);
     }
 
-    public function custom_html_after_cart_totals() {
+    function custom_shipping_condition($rates, $package) {
+        // error_log(print_r($rates, true));
+        
+        foreach ($rates as $rate_id => $rate) {
+            // Modify the rate as needed
+            $rates[$rate_id]->cost = 12.9; // Replace with your custom rate
+        }
+
+        return $rates;
+    }
+
+
+    public function wpo_wcpdf_box_value($document_type, $order)
+    {
+        if( !empty($order) && $document_type == 'packing-slip' ) {
+            $box_value = get_post_meta( $order->get_id(), '_mcs_wc_box_value', true );    
+            echo "<div><strong>Shipping</strong>: {$box_value}</div>";
+        }
+    }
+
+    public function insert_row_after_line_items($order_id) {
+        $box_value = get_post_meta( $order_id, '_mcs_wc_box_value', true );
+        echo '<tr class="order_item">';
+        echo '<td class="">' . "<strong>Shipping</strong>" . '</td>'; // Replace 'New Row Label' with your desired label
+        echo '<td class="">' . $box_value . '</td>';
+        echo '</tr>';
+    }
+
+    public function add_checkout_field()
+    {
+        $text_value = $this->get_box_value_text()['text'];
+        echo '<div id="mcs_wc_box_value_wrapper" style="display:none;">';
+        woocommerce_form_field('mcs_wc_box_value', array(
+            'type' => 'hidden',
+            'class' => array('form-row-wide'),
+            'label' => __('Shipping Box', 'text-domain'),
+            'default' => $text_value,
+        ), $text_value);
+        echo '</div>';
+    }
+
+    public function save_checkout_field($order_id) 
+    {
+        // error_log("Order ID: " . $order_id);
+        // error_log(print_r($_POST['mcs_wc_box_value'], true));
+        // error_log(isset($_POST['mcs_wc_box_value']) && ! empty($_POST['mcs_wc_box_value']));
+
+        $mcs_wc_box_value = $_POST['mcs_wc_box_value'];
+        if ( !empty($mcs_wc_box_value) )
+            update_post_meta( $order_id, '_mcs_wc_box_value', sanitize_text_field($mcs_wc_box_value) );
+    }
+
+    public function custom_html_after_cart_totals()
+    {
         echo $this->render('shortcode_box_view', [
             'id'    => 'mcs_wcb_box_view_cart_page',
             'boxes' => $this->available_boxes
         ]);
     }
 
-    public function add_additional_charge_with_label($cart)
+    public function get_box_value_text()
     {
-        if (is_admin() && !defined('DOING_AJAX'))
-            return;
-
         $assigned = $this->get_assigned_boxes();
         $add_cost = 0;
         $box_qty = [
@@ -65,19 +120,24 @@ class Box_Control extends Base
         foreach ($assigned['box']['size'] as $size) {
             $size = strtolower($size);
             if ($size == 'small') {
-                $add_cost += 30;
+                // $add_cost += 30;
                 $box_qty['small']++;
             } elseif ($size == 'large') {
-                $add_cost += 50;
+                // $add_cost += 50;
                 $box_qty['large']++;
             }
         }
 
-        if ($this->rules->is_min_box_fill_rate_reached(number_format(($assigned['pv'] / $assigned['box']['max_point_value']) * 100, 2))) {
-            if ($this->rules->is_min_spent_reached()) {
-                $add_cost = 0; // reset cost to 0usd if min spent is reached
-            }
-        }
+        $progress = number_format(($assigned['pv'] / $assigned['box']['max_point_value']) * 100, 2);
+
+        /**
+         * Note: Disable rules for now
+         */
+        // if ($this->rules->is_min_box_fill_rate_reached(number_format(($assigned['pv'] / $assigned['box']['max_point_value']) * 100, 2))) {
+        //     if ($this->rules->is_min_spent_reached()) {
+        //         // $add_cost = 0; // reset cost to 0usd if min spent is reached
+        //     }
+        // }
 
         $box_label = '';
         if ($box_qty['small'] > 0) {
@@ -90,10 +150,12 @@ class Box_Control extends Base
             $box_label .= "Large box x{$box_qty['large']}";
         }
 
-        $additional_charge = $add_cost; // Set your additional charge here
-        $label = "Shipping ({$box_label})"; // Set your label here
+        // $additional_charge = $add_cost; // Set your additional charge here
+        $text = "{$box_label}  ({$progress}% full)."; // Set your label here
 
-        $cart->add_fee($label, $additional_charge);
+        return [
+            'text' => $text
+        ];
     }
 
     public function get_assigned_boxes()
@@ -227,7 +289,7 @@ class Box_Control extends Base
             echo json_encode([
                 'success'  => 'Box status updated',
                 'cart_items_point_value' => $pv,
-                'progress' => number_format(($pv / $boxes['max_point_value']) * 100, 2),
+                'progress' => $pv == 0 ? 0 : number_format(($pv / $boxes['max_point_value']) * 100, 2),
                 'boxes'    => $boxes
             ]);
         } catch (\Throwable $th) {

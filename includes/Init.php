@@ -16,9 +16,9 @@ class Init {
     {
         // Check ig page is not admin
         if ( is_admin() ) {
-            new Admin_Product();
+            new \WCB\Admin_Product();
         }
-        new Box_Control($this->config);
+        new \WCB\Box_Control($this->config);
     }
 
     public function load_config(Array $config)

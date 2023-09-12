@@ -63,26 +63,26 @@ jQuery(function ($) {
 
 
     $(document.body).on('added_to_cart', function (event, fragments, cart_hash, $button) {
-        console.log('Added to cart');
+        console.log('added_to_cart');
         // Your code to run when an item is added to the cart
         update_box_status();
     });
 
     $(document.body).on('updated_cart_totals', function () {
         // Your code to run when the cart is updated
-        console.log('Cart has been updated!');
+        console.log('updated_cart_totals');
         update_box_status();
     });
 
     $(document.body).on('removed_from_cart', function () {
         // Your code to run when the cart is updated
-        console.log('Cart has been updated!');
+        console.log('removed_from_cart');
         update_box_status();
     });
 
     $(document.body).on('updated_wc_div', function () {
         // Your code to run when the cart is updated
-        console.log('Cart has been updated!');
+        console.log('updated_wc_div');
         update_box_status();
     });
 
