@@ -9,7 +9,8 @@ class Init {
     public function __construct($config = null)
     {
         $this->load_config($config);
-        $this->init();
+        add_action( 'init', [$this, 'init'] );
+        // $this->init();
     }
 
     public function init()
@@ -17,6 +18,7 @@ class Init {
         // Check ig page is not admin
         if ( is_admin() ) {
             new \WCB\Admin_Product();
+            new \WCB\Admin_Settings($this->config);
         }
         new \WCB\Box_Control($this->config);
     }
